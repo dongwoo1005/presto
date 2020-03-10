@@ -26,10 +26,4 @@
       <name>fs.azure.account.key.%ABFS_ACCOUNT%.dfs.core.windows.net</name>
       <value>%ABFS_ACCESS_KEY%</value>
     </property>
-
-    <property>
-        <!-- HACK to make possible to update a table location to abfs -->
-        <name>fs.abfs.impl</name>
-        <value>org.apache.hadoop.fs.LocalFileSystem</value>
-    </property>
 </configuration>
