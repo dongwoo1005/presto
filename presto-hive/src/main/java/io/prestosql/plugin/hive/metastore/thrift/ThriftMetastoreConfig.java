@@ -13,6 +13,8 @@
  */
 package io.prestosql.plugin.hive.metastore.thrift;
 
+import com.google.common.base.Splitter;
+import com.google.common.collect.ImmutableList;
 import com.google.common.net.HostAndPort;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
@@ -22,8 +24,12 @@ import io.prestosql.plugin.hive.util.RetryDriver;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
-
+import java.io.File;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.Objects.requireNonNull;
 
 public class ThriftMetastoreConfig
 {
@@ -37,6 +43,21 @@ public class ThriftMetastoreConfig
     private boolean impersonationEnabled;
     private boolean deleteFilesOnDrop;
     private Duration maxWaitForTransactionLock = new Duration(10, TimeUnit.MINUTES);
+
+    private boolean sslEnabled;
+    private List<String> ciphers = ImmutableList.of();
+
+//    private File trustCertificate;
+//    private File key;
+//    private String keyPassword;
+
+    private long sessionCacheSize;
+    private Duration sessionTimeout = new Duration(1, DAYS);
+
+    private File keystore;
+    private String keystorePassword;
+    private File truststore;
+    private String truststorePassword;
 
     @NotNull
     public Duration getMetastoreTimeout()
@@ -167,6 +188,87 @@ public class ThriftMetastoreConfig
     public ThriftMetastoreConfig setMaxWaitForTransactionLock(Duration maxWaitForTransactionLock)
     {
         this.maxWaitForTransactionLock = maxWaitForTransactionLock;
+        return this;
+    }
+
+    public boolean isSslEnabled() {
+        return sslEnabled;
+    }
+
+    @Config("hive.metastore.thrift.client.ssl.enabled")
+    @ConfigDescription("")
+    public ThriftMetastoreConfig setSslEnabled(boolean sslEnabled) {
+        this.sslEnabled = sslEnabled;
+        return this;
+    }
+
+    public File getTrustCertificate() {
+        return trustCertificate;
+    }
+
+    @Config("hive.metastore.thrift.client.ssl.trust-certificate")
+    @ConfigDescription("")
+    public ThriftMetastoreConfig setTrustCertificate(File trustCertificate) {
+        this.trustCertificate = trustCertificate;
+        return this;
+    }
+
+    public File getKey() {
+        return key;
+    }
+
+    @Config("hive.metastore.thrift.client.ssl.key")
+    @ConfigDescription("")
+    public ThriftMetastoreConfig setKey(File key) {
+        this.key = key;
+        return this;
+    }
+
+    public String getKeyPassword() {
+        return keyPassword;
+    }
+
+    @Config("hive.metastore.thrift.client.ssl.key-password")
+    @ConfigDescription("")
+    public ThriftMetastoreConfig setKeyPassword(String keyPassword) {
+        this.keyPassword = keyPassword;
+        return this;
+    }
+
+    public long getSessionCacheSize() {
+        return sessionCacheSize;
+    }
+
+    @Config("hive.metastore.thrift.client.ssl.session-cache-size")
+    @ConfigDescription("")
+    public ThriftMetastoreConfig setSessionCacheSize(long sessionCacheSize) {
+        this.sessionCacheSize = sessionCacheSize;
+        return this;
+    }
+
+    public Duration getSessionTimeout() {
+        return sessionTimeout;
+    }
+
+    @Config("hive.metastore.thrift.client.ssl.session-timeout")
+    @ConfigDescription("")
+    public ThriftMetastoreConfig setSessionTimeout(Duration sessionTimeout) {
+        this.sessionTimeout = sessionTimeout;
+        return this;
+    }
+
+    public List<String> getCiphers() {
+        return ciphers;
+    }
+
+    @Config("hive.metastore.thrift.client.ssl.ciphers")
+    @ConfigDescription("")
+    public ThriftMetastoreConfig setCiphers(String ciphers) {
+        this.ciphers = Splitter
+            .on(',')
+            .trimResults()
+            .omitEmptyStrings()
+            .splitToList(requireNonNull(ciphers, "ciphers is null"));
         return this;
     }
 }

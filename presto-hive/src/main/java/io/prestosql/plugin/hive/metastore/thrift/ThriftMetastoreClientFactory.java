@@ -17,11 +17,20 @@ import com.google.common.net.HostAndPort;
 import io.airlift.units.Duration;
 import io.prestosql.plugin.hive.authentication.HiveMetastoreAuthentication;
 import io.prestosql.spi.NodeManager;
+import io.prestosql.spi.PrestoException;
 import org.apache.thrift.transport.TTransportException;
 
 import javax.inject.Inject;
-import javax.net.ssl.SSLContext;
+import javax.net.ssl.*;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static java.lang.Math.toIntExact;
@@ -50,14 +59,53 @@ public class ThriftMetastoreClientFactory
     }
 
     @Inject
-    public ThriftMetastoreClientFactory(ThriftMetastoreConfig config, HiveMetastoreAuthentication metastoreAuthentication, NodeManager nodeManager)
+    public ThriftMetastoreClientFactory(
+        ThriftMetastoreConfig config,
+        HiveMetastoreAuthentication metastoreAuthentication,
+        NodeManager nodeManager)
     {
-        this(Optional.empty(), Optional.ofNullable(config.getSocksProxy()), config.getMetastoreTimeout(), metastoreAuthentication, nodeManager.getCurrentNode().getHost());
+        this(
+            buildSslContext(config.isSslEnabled(), config.getKey(), config.getKeyPassword(), config.getTrustCertificate()),
+            Optional.ofNullable(config.getSocksProxy()),
+            config.getMetastoreTimeout(),
+            metastoreAuthentication,
+            nodeManager.getCurrentNode().getHost());
     }
 
     public ThriftMetastoreClient create(HostAndPort address, Optional<String> delegationToken)
             throws TTransportException
     {
-        return new ThriftHiveMetastoreClient(Transport.create(address, sslContext, socksProxy, timeoutMillis, metastoreAuthentication, delegationToken), hostname);
+        return new ThriftHiveMetastoreClient(
+            Transport.create(address, sslContext, socksProxy, timeoutMillis, metastoreAuthentication, delegationToken),
+            hostname);
+    }
+
+    private static Optional<SSLContext> buildSslContext(boolean sslEnabled, File key, String keyPassword, File trustCertificate) {
+        if (!sslEnabled || (key == null && trustCertificate == null)) {
+            return Optional.empty();
+        }
+
+        try {
+            KeyManager[] keyManagers = null;
+            if (key != null) {
+                KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+                keyManagerFactory.init(keyStore, keyManagerPassword);
+                keyManagers = keyManagerFactory.getKeyManagers();
+            }
+
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init(trustStore);
+
+            TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
+            if (trustManagers.length != 1 || !(trustManagers[0] instanceof X509TrustManager)) {
+                throw new RuntimeException("Unexpected default trust managers:" + Arrays.toString(trustManagers));
+            }
+
+            SSLContext sslContext = SSLContext.getInstance("SSL");
+            sslContext.init(keyMangers, trustManagers, null);
+            return Optional.of(sslContext);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
     }
 }
